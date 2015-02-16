@@ -15,8 +15,8 @@ function update_map() {
 
 
 function update_map_merged() {
-	php $BASEDIR"/ffmap-merged/nodes_merger.php"
-	php $BASEDIR"/ffmap-merged/nodes_filter.php"
+	php $BASEDIR"/scripts/merge/nodes_merger.php"
+	php $BASEDIR"/scripts/merge/nodes_filter.php"
 	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/nodes-merged-aachen.json ssh-721223-map@freifunk-aachen.de:~/merged/nodes.json
 }
 
