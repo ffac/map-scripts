@@ -40,15 +40,18 @@ function update_hosts() {
 
 
 function update_stats() {
-	#TODO/PERFORMANCE: Pipe jq output to nc directly
 	STATSBASEDIR=$BASEDIR"/data/stats/"
 	TSTAMP=$(date +%s)
 	{\
-		jq -r '.nodes[]|select(.clientcount !=null)|.id+".clientcount "+(.clientcount|tostring)' $BASEDIR/data/nodes.json; \
-	} | while read line
-	do
-		echo "freifunk.nodes."$line" "$TSTAMP | nc localhost 2003
-		ID=$(echo $line | grep -oP '^.*(?=.clientcount)')
+		jq -r ".nodes[]|select(.clientcount !=null)|.id+\".clientcount \"+(.clientcount|tostring)+\" "$TSTAMP"\"" $BASEDIR/data/nodes.json; \
+		jq -r ".nodes[]|select(.clientcount !=null and .src_index==0)|.id+\".clientcount \"+(.clientcount|tostring)+\" "$TSTAMP"\"" $BASEDIR/data/nodes-merged-aachen.json; \
+	} | nc localhost 2003
+}
+
+function dump_stats() {
+	STATSBASEDIR=$BASEDIR"/data/stats/"
+	GRAPHITEBASEDIR=/opt/graphite
+	for ID in `ls $GRAPHITEBASEDIR/storage/whisper/freifunk/nodes/`; do
 		STATSDIR=$STATSBASEDIR"/nodes/"$ID
 		[ -d $STATSDIR ] || /bin/mkdir -p $STATSDIR
 		if [ -d $STATSDIR ]; then
@@ -82,20 +85,32 @@ function push_stats() {
 	rsync --delete -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/stats ssh-721223-map@freifunk-aachen.de:~/new/
 }
 
-case $ACTION in
-    map )
-	update_map
-	update_stats	
-        ;;
-    stats )
-        update_stats
-        push_stats
-        ;;
-    * ) dump_alfred
-	dump_batadv-vis
-	update_map_merged
-	update_hosts
-	push_stats
-	;;
-esac
+MINUTE=$(date +%m)
+EVERY=5
 
+if [ "$ACTION" != "" ]; then
+
+	case $ACTION in
+		dummy)
+			;;
+		*)	
+			;;
+	esac
+
+else
+	if [ $(($MINUTE % $EVERY)) -eq 0 ]; then
+		# Every $EVERY minutes
+		dump_alfred
+		dump_batadv-vis
+		update_map
+		update_map_merged
+		update_stats
+		update_hosts
+		dump_stats
+		push_stats
+	else
+		# Every call
+		update_map
+		update_stats
+	fi
+fi
