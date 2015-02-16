@@ -85,7 +85,7 @@ function push_stats() {
 	rsync --delete -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/stats ssh-721223-map@freifunk-aachen.de:~/new/
 }
 
-MINUTE=$(date +%m)
+MINUTE=$(date +%M)
 EVERY=5
 
 if [ "$ACTION" != "" ]; then
