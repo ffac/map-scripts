@@ -40,16 +40,11 @@ function update_hosts() {
 
 
 function update_stats() {
-	STATSBASEDIR=$BASEDIR"/data/stats/"
 	TSTAMP=$(date +%s)
 	{\
 		jq -r ".nodes[]|select(.clientcount !=null)|\"freifunk.nodes.\"+.id+\".clientcount \"+(.clientcount|tostring)+\" "$TSTAMP"\"" $BASEDIR/data/nodes.json; \
 		jq -r ".nodes[]|select(.clientcount !=null and .src_index==0)|\"freifunk.nodes.\"+.id+\".clientcount \"+(.clientcount|tostring)+\" "$TSTAMP"\"" $BASEDIR/data/nodes-merged-aachen.json; \
 	} | nc -q0 localhost 2003 
-#	| while read line
-#	do
-#		echo $line | nc -q0 localhost 2003
-#	done
 }
 
 function dump_stats() {
