@@ -23,11 +23,14 @@ $links        = array();
 $offsets_arr  = array(0);
 $offset       = 0;
 $json_counter = 0;
+$meta_arr = array();
 
 foreach($src_urls as $src_index => $src_url) {                                                             // from each url
   $src_json   = file_get_contents($src_url);                                                 // get nodes.json
   $src_arr    = json_decode($src_json,TRUE);                                                 // and convert to url
-
+  if ($src_index == 1) {
+    $meta_arr = $src_arr['meta'];
+  }
   foreach($src_arr['nodes'] as $node_arr) {                                                  // run through nodes
     $node = new stdClass();
     $node = json_decode(json_encode($node_arr), FALSE);
@@ -64,7 +67,6 @@ foreach ($nodes_arr as $nkey=>$node) {
   }
 }
 
-$meta_arr   = array("timestamp" => date("Y-m-d\TH:i:s"));                                    // create timestamp and push it to meta array
 $output_arr = array("nodes" => $nodes_arr,"meta" => $meta_arr,"links" => $links_arr);        // build output array from new nodes array, meta array and new links array
 
 file_put_contents($json_file,json_encode($output_arr,JSON_UNESCAPED_SLASHES));               // output as json object to nodes.json
