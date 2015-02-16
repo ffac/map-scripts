@@ -52,10 +52,12 @@ function update_stats() {
 		STATSDIR=$STATSBASEDIR"/nodes/"$ID
 		[ -d $STATSDIR ] || /bin/mkdir -p $STATSDIR
 		if [ -d $STATSDIR ]; then
-			for TIME in -24h -14d -1mon -1y; do
+			for TIME in -4h -24h -14d -1mon -1y; do
 				STEPS=24
 				GROUP=1h
 				case $TIME in
+					-4h )	STEPS=16; GROUP="15min"
+						;;
 					-24h )
 						STEPS=24; GROUP="1h"
 						;;
