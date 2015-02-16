@@ -95,9 +95,16 @@ EVERY=5
 if [ "$ACTION" != "" ]; then
 
 	case $ACTION in
-		stats)  update_stats
+		stats)  
+			update_stats
 			dump_stats
 			push_stats
+			;;
+		map)	
+			update_map
+			;;
+		map-merged)
+			update_map_merged
 			;;
 		*)	
 			;;
