@@ -52,20 +52,23 @@ function update_stats() {
 		STATSDIR=$STATSBASEDIR"/nodes/"$ID
 		[ -d $STATSDIR ] || /bin/mkdir -p $STATSDIR
 		if [ -d $STATSDIR ]; then
-			for TIME in -24h -7d -1m -1y; do
+			for TIME in -24h -14d -1mon -1y; do
 				STEPS=24
+				GROUP=1h
 				case $TIME in
 					-24h )
-						STEPS=24
+						STEPS=24; GROUP="1h"
 						;;
-					-7d )	STEPS=14
+					-14d )	STEPS=14; GROUP="1d"
 						;;
-					-1m )	STEPS=15
+					-1mon )	STEPS=30; GROUP="1d"
 						;;
-					-1y )	STEPS=24
+					-1y )	STEPS=12; GROUP="1mon"
 						;;
 				esac	
-				URL="http://localhost:8002/render?target=freifunk.nodes."$ID".clientcount&format=json&from="$TIME"&yStep=1&maxDataPoints="$STEPS
+				#summarize(freifunk.nodes.14:cc:20:62:fa:0a.clientcount,"1h","avg")
+				URL="http://localhost:8002/render?target=summarize(freifunk.nodes."$ID".clientcount,\""$GROUP"\",\"avg\")&format=json&from="$TIME
+				#&maxDataPoints="$STEPS
 				JSON=$STATSDIR"/clientcount_"$TIME".json"
 				wget -qO "$JSON" "$URL"
 			done	
@@ -74,13 +77,13 @@ function update_stats() {
 }
 
 function push_stats() {
-	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/stats ssh-721223-map@freifunk-aachen.de:~/new/
+	rsync --delete -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/stats ssh-721223-map@freifunk-aachen.de:~/new/
 }
 
 case $ACTION in
     map )
 	update_map
-	update_map_merged
+	update_stats	
         ;;
     stats )
         update_stats
@@ -88,10 +91,8 @@ case $ACTION in
         ;;
     * ) dump_alfred
 	dump_batadv-vis
-	update_map
 	update_map_merged
 	update_hosts
-	update_stats
 	push_stats
 	;;
 esac
