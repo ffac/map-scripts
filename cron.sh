@@ -42,8 +42,8 @@ function update_hosts() {
 function update_stats() {
 	TSTAMP=$(date +%s)
 	{\
-		jq -r ".nodes[]|select(.clientcount !=null)|\"freifunk.nodes.\"+.id+\".clientcount \"+(.clientcount|tostring)+\" "$TSTAMP"\"" $BASEDIR/data/nodes.json; \
 		jq -r ".nodes[]|select(.clientcount !=null and .src_index==0)|\"freifunk.nodes.\"+.id+\".clientcount \"+(.clientcount|tostring)+\" "$TSTAMP"\"" $BASEDIR/data/nodes-merged-aachen.json; \
+		jq -r ".nodes[]|select(.clientcount !=null)|\"freifunk.nodes.\"+.id+\".clientcount \"+(.clientcount|tostring)+\" "$TSTAMP"\"" $BASEDIR/data/nodes.json; \
 	} | nc -q0 localhost 2003 
 }
 
@@ -119,6 +119,7 @@ else
 	else
 		# Every call
 		update_map
+		update_map_merged
 		update_stats
 	fi
 fi
