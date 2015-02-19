@@ -42,9 +42,22 @@ function update_hosts() {
 function update_stats() {
 	TSTAMP=$(date +%s)
 	{\
+		#Client count of merged nodes
 		jq -r ".nodes[]|select(.clientcount !=null and .src_index==0)|\"freifunk.nodes.\"+.id+\".clientcount \"+(.clientcount|tostring)+\" "$TSTAMP"\"" $BASEDIR/data/nodes-merged-aachen.json; \
-		jq -r ".nodes[]|select(.clientcount !=null)|\"freifunk.nodes.\"+.id+\".clientcount \"+(.clientcount|tostring)+\" "$TSTAMP"\"" $BASEDIR/data/nodes.json; \
-	} | nc -q0 localhost 2003 
+
+		#Alfred stats
+		jq -r '.|to_entries|.[] as $node|{
+				loadavg: $node.value.loadavg,
+				uptime: $node.value.uptime
+			}|to_entries|.[] as $item|select($item.value != null)|"freifunk.nodes."+$node.key+"." + $item.key +" "+($item.value|tostring)+" '$TSTAMP'"' $BASEDIR/data/alfred-statistics.json
+
+
+		#Nodes stats
+		jq -r '.nodes[] as $node|{
+				clientcount: $node.clientcount
+			}|to_entries|.[] as $item|select($item.value != null)|"freifunk.nodes."+$node.id+"." + $item.key +" "+($item.value|tostring)+" '$TSTAMP'"' $BASEDIR/data/nodes.json
+
+	}  | nc -q0 localhost 2003
 }
 
 function dump_stats() {
