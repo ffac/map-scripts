@@ -119,20 +119,17 @@ if [ "$ACTION" != "" ]; then
 	esac
 
 else
+	# Every call
+	dump_alfred
+        dump_batadv-vis
+        update_map
+        update_map_merged
+        update_stats
+
 	if [ $(($MINUTE % $EVERY)) -eq 0 ]; then
 		# Every $EVERY minutes
-		dump_alfred
-		dump_batadv-vis
-		update_map
-		update_map_merged
-		update_stats
 		update_hosts
 		dump_stats
 		push_stats
-	else
-		# Every call
-		update_map
-		update_map_merged
-		update_stats
 	fi
 fi
