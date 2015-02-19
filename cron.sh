@@ -54,6 +54,7 @@ function update_stats() {
 
 		#Nodes stats
 		jq -r '.nodes[] as $node|{
+				online: (if $node.flags.online != null then (if $node.flags.online == true then "1" else "0" end) else null end),
 				clientcount: $node.clientcount
 			}|to_entries|.[] as $item|select($item.value != null)|"freifunk.nodes."+$node.id+"." + $item.key +" "+($item.value|tostring)+" '$TSTAMP'"' $BASEDIR/data/nodes.json
 
