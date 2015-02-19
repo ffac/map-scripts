@@ -39,7 +39,7 @@ function update_hosts() {
 }
 
 
-function update_stats() {
+function prepare_stats() {
 	TSTAMP=$(date +%s)
 	{\
 		#Client count of merged nodes
@@ -58,7 +58,15 @@ function update_stats() {
 				clientcount: $node.clientcount
 			}|to_entries|.[] as $item|select($item.value != null)|"freifunk.nodes."+$node.id+"." + $item.key +" "+($item.value|tostring)+" '$TSTAMP'"' $BASEDIR/data/nodes.json
 
-	}  | nc -q0 localhost 2003
+	}
+}
+
+function update_stats() {
+	prepare_stats | nc -q0 localhost 2003
+} 
+
+function test_stats() {
+	prepare_stats
 }
 
 function dump_stats() {
@@ -108,6 +116,9 @@ if [ "$ACTION" != "" ]; then
 			update_stats
 			dump_stats
 			push_stats
+			;;
+		stats-test)
+			test_stats
 			;;
 		map)	
 			update_map
