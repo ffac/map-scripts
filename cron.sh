@@ -42,9 +42,6 @@ function update_hosts() {
 function prepare_stats() {
 	TSTAMP=$(date +%s)
 	{\
-		#Client count of merged nodes
-		jq -r ".nodes[]|select(.clientcount !=null and .src_index==0)|\"freifunk.nodes.\"+.id+\".clientcount \"+(.clientcount|tostring)+\" "$TSTAMP"\"" $BASEDIR/data/nodes-merged-aachen.json; \
-
 		#Alfred stats
 		jq -r '.|to_entries|.[] as $node|{
 				loadavg: $node.value.loadavg,
