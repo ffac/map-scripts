@@ -45,7 +45,18 @@ function prepare_stats() {
 		#Alfred stats
 		jq -r '.|to_entries|.[] as $node|{
 				loadavg: $node.value.loadavg,
-				uptime: $node.value.uptime
+				uptime: $node.value.uptima,
+				"traffic.forward.bytes": $node.value.traffic.forward.bytes,
+				"traffic.mgmt_rx.bytes": $node.value.traffic.mgmt_rx.bytes,
+				"traffic.rx.bytes": $node.value.traffic.rx.bytes,
+				"traffic.mgmt_tx.bytes": $node.value.traffic.mgmt_tx.bytes,
+				"traffic.tx.bytes": $node.value.traffic.tx.bytes,
+				"rootfs_usage": $node.value.rootfs_usage,
+				"memory.buffers": $node.value.memory.buffers,
+				"memory.total": $node.value.memory.total,
+				"memory.cached": $node.value.memory.cached,
+				"memory.free": $node.value.memory.free,
+				"rootfs_usage": $node.value.rootfs_usage
 			}|to_entries|.[] as $item|select($item.value != null)|"freifunk.nodes."+$node.key+"." + $item.key +" "+($item.value|tostring)+" '$TSTAMP'"' $BASEDIR/data/alfred-statistics.json
 
 
@@ -74,24 +85,29 @@ function dump_stats() {
 		[ -d $STATSDIR ] || /bin/mkdir -p $STATSDIR
 		if [ -d $STATSDIR ]; then
 			for TIME in -4h -24h -14d -1mon -1y; do
-				STEPS=24
 				GROUP=1h
 				case $TIME in
-					-4h )	STEPS=16; GROUP="15min"
+					-4h )	GROUP="15min"
 						;;
 					-24h )
-						STEPS=24; GROUP="1h"
+						GROUP="1h"
 						;;
-					-14d )	STEPS=14; GROUP="1d"
+					-14d )	GROUP="1d"
 						;;
-					-1mon )	STEPS=30; GROUP="1d"
+					-1mon )	GROUP="1d"
 						;;
-					-1y )	STEPS=12; GROUP="1mon"
+					-1y )	GROUP="1mon"
 						;;
-				esac	
-				#summarize(freifunk.nodes.14:cc:20:62:fa:0a.clientcount,"1h","avg")
+				esac
+				GURL="http://localhost:8002/render?format=json&from="$TIME
+				GURL+="&target=alias(summarize(freifunk.nodes."$ID".clientcount,\""$GROUP"\",\"avg\"),\"clientcount\")"
+				GURL+="&target=alias(summarize(freifunk.nodes."$ID".loadavg,\""$GROUP"\",\"avg\"),\"loadavg\")"
+				GURL+="&target=alias(summarize(freifunk.nodes."$ID".uptime,\""$GROUP"\",\"last\"),\"uptime\")"
+
+				JSON=$STATSDIR"/statistics_"$TIME".json"
+                                wget -qO "$JSON" "$GURL"
+
 				URL="http://localhost:8002/render?target=summarize(freifunk.nodes."$ID".clientcount,\""$GROUP"\",\"avg\")&format=json&from="$TIME
-				#&maxDataPoints="$STEPS
 				JSON=$STATSDIR"/clientcount_"$TIME".json"
 				wget -qO "$JSON" "$URL"
 			done	
