@@ -5,6 +5,7 @@ BASEDIR=/opt/freifunk
 
 source /etc/environment
 
+# Create nodes.json for ffmap-d3
 function update_map() {
 	CWD=`pwd`
 	cd $BASEDIR"/ffmap-backend"
@@ -14,6 +15,7 @@ function update_map() {
 } 
 
 
+# Obsolete: Merge nodes from Rheinufer with nodes from Aachen
 function update_map_merged() {
 	php $BASEDIR"/scripts/merge/nodes_merger.php"
 	php $BASEDIR"/scripts/merge/nodes_filter.php"
@@ -21,17 +23,34 @@ function update_map_merged() {
 }
 
 
+# Dump alfred data
 function dump_alfred() {
+	# Save node info
 	alfred-json -zr 158 > $BASEDIR"/data/alfred-nodeinfo.json"
+
+	# Save not statistics
 	alfred-json -zr 159 > $BASEDIR"/data/alfred-statistics.json"
+
+	# Merge node info and stats
+	jq -s '[. as $all|$all[0]|to_entries[] as $node|{ key: $node.key, value: ($node.value + $all[1][$node.key]) }]|from_entries|.'\
+		 $BASEDIR/data/alfred-nodeinfo.json $BASEDIR/data/alfred-statistics.json > $BASEDIR/data/alfred-merged.json
+
+	# Filter merged result for public usage
+	jq '[.|to_entries[] as $node|{ key: $node.key, value: {
+			hostname: $node.value.hostname,
+			software: $node.value.software,
+			hardware: $node.value.hardware
+		}}]|from_entries|.' $BASEDIR/data/alfred-merged.json > $BASEDIR/data/alfred-public.json
 }
 
 
+# Save vis data
 function dump_batadv-vis() {
 	batadv-vis > $BASEDIR"/data/batadv-vis.json"
 }
 
 
+# Create host file for dnsmasq to allow name resolution of nodes
 function update_hosts() {
 	jq -r '.[]|select(.network.addresses|length > 0)|.network.addresses[] +" " +.hostname +".nodes.freifunk-aachen.de"|.' $BASEDIR/data/alfred-nodeinfo.json | grep -iE "^2a03" > $BASEDIR"/data/hosts"
 	PID=$(pidof dnsmasq)
@@ -39,6 +58,7 @@ function update_hosts() {
 }
 
 
+# Collect stats for piping them into graphite
 function prepare_stats() {
 	TSTAMP=$(date +%s)
 	{\
@@ -69,15 +89,59 @@ function prepare_stats() {
 	}
 }
 
+
+# Finally pipe the collected stats into graphite
 function update_stats() {
 	prepare_stats | nc -q0 localhost 2003
 } 
 
+
+# For testing purposes
 function test_stats() {
 	prepare_stats
 }
 
+
+# Create json files containing stat data for chart views
 function dump_stats() {
+        STATSBASEDIR=$BASEDIR"/data/stats/"
+        GRAPHITEBASEDIR=/opt/graphite
+        declare -A TIMESGROUPBY=(
+                ["4h"]="15min"
+                ["24h"]="1h"
+                ["14d"]="1d"
+                ["1mon"]="1d"
+                ["1y"]="1mon"
+        )
+        declare -A METRICSAGGREGATION=(
+                ["clientcount"]="avg"
+                ["loadavg"]="avg"
+                ["uptime"]="last"
+        )
+        for ID in `ls $GRAPHITEBASEDIR/storage/whisper/freifunk/nodes/`; do
+                STATSDIR=$STATSBASEDIR"/nodes/"$ID
+                [ -d $STATSDIR ] || /bin/mkdir -p $STATSDIR
+                if [ -d $STATSDIR ]; then
+                        JSON=$STATSDIR"/statistics.json"
+                        {\
+                        for TIME in "${!TIMESGROUPBY[@]}"; do
+                                GROUP=${TIMESGROUPBY["$TIME"]}
+
+                                GURL="http://localhost:8002/render?format=json&from=-"$TIME
+                                for METRIC in "${!METRICSAGGREGATION[@]}"; do
+                                        AGG=${METRICSAGGREGATION["$METRIC"]}
+                                        GURL+="&target=alias(summarize(freifunk.nodes."$ID"."$METRIC",\""$GROUP"\",\""$AGG"\"),\""$METRIC"_"$TIME"\")"
+                                done
+                                wget -qO- "$GURL"
+                        done
+                        } | jq -s '.' > "$JSON"
+                fi
+        done
+}
+
+
+# Obsolete: Every metric had its own file. They are now collected in one file (statistics.json)
+function dump_stats_old() {
 	STATSBASEDIR=$BASEDIR"/data/stats/"
 	GRAPHITEBASEDIR=/opt/graphite
 	for ID in `ls $GRAPHITEBASEDIR/storage/whisper/freifunk/nodes/`; do
@@ -99,14 +163,6 @@ function dump_stats() {
 					-1y )	GROUP="1mon"
 						;;
 				esac
-				GURL="http://localhost:8002/render?format=json&from="$TIME
-				GURL+="&target=alias(summarize(freifunk.nodes."$ID".clientcount,\""$GROUP"\",\"avg\"),\"clientcount\")"
-				GURL+="&target=alias(summarize(freifunk.nodes."$ID".loadavg,\""$GROUP"\",\"avg\"),\"loadavg\")"
-				GURL+="&target=alias(summarize(freifunk.nodes."$ID".uptime,\""$GROUP"\",\"last\"),\"uptime\")"
-
-				JSON=$STATSDIR"/statistics_"$TIME".json"
-                                wget -qO "$JSON" "$GURL"
-
 				URL="http://localhost:8002/render?target=summarize(freifunk.nodes."$ID".clientcount,\""$GROUP"\",\"avg\")&format=json&from="$TIME
 				JSON=$STATSDIR"/clientcount_"$TIME".json"
 				wget -qO "$JSON" "$URL"
@@ -115,9 +171,13 @@ function dump_stats() {
 	done
 }
 
+
+# Push stats to the web server
 function push_stats() {
-	rsync --delete -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/stats ssh-721223-map@freifunk-aachen.de:~/new/
+	rsync --delete -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/stats $BASEDIR/data/alfred-public.json ssh-721223-map@freifunk-aachen.de:~/new/
 }
+
+
 
 MINUTE=$(date +%M)
 EVERY=5
@@ -128,6 +188,7 @@ if [ "$ACTION" != "" ]; then
 		stats)  
 			update_stats
 			dump_stats
+			dump_stats_old
 			push_stats
 			;;
 		stats-test)
