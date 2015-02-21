@@ -65,7 +65,7 @@ function prepare_stats() {
 		#Alfred stats
 		jq -r '.|to_entries|.[] as $node|{
 				loadavg: $node.value.loadavg,
-				uptime: $node.value.uptima,
+				uptime: $node.value.uptime,
 				"traffic.forward.bytes": $node.value.traffic.forward.bytes,
 				"traffic.mgmt_rx.bytes": $node.value.traffic.mgmt_rx.bytes,
 				"traffic.rx.bytes": $node.value.traffic.rx.bytes,
