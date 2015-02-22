@@ -114,7 +114,7 @@ function dump_stats() {
                 ["1y"]="1mon"
         )
         declare -A METRICSAGGREGATION=(
-                ["clientcount"]="avg"
+                ["clientcount"]="max"
                 ["loadavg"]="avg"
                 ["uptime"]="last"
         )
