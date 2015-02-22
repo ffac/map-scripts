@@ -28,7 +28,7 @@ function dump_alfred() {
 	# Save node info
 	alfred-json -zr 158 > $BASEDIR"/data/alfred-nodeinfo.json"
 
-	# Save not statistics
+	# Save node statistics
 	alfred-json -zr 159 > $BASEDIR"/data/alfred-statistics.json"
 
 	# Merge node info and stats
