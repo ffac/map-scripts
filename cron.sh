@@ -117,6 +117,8 @@ function dump_stats() {
                 ["clientcount"]="max"
                 ["loadavg"]="avg"
                 ["uptime"]="last"
+		["traffic.rx.bytes"]="sum"
+		["traffic.tx.bytes"]="sum"
         )
         for ID in `ls $GRAPHITEBASEDIR/storage/whisper/freifunk/nodes/`; do
                 STATSDIR=$STATSBASEDIR"/nodes/"$ID
