@@ -140,43 +140,10 @@ function dump_stats() {
 }
 
 
-# Obsolete: Every metric had its own file. They are now collected in one file (statistics.json)
-function dump_stats_old() {
-	STATSBASEDIR=$BASEDIR"/data/stats/"
-	GRAPHITEBASEDIR=/opt/graphite
-	for ID in `ls $GRAPHITEBASEDIR/storage/whisper/freifunk/nodes/`; do
-		STATSDIR=$STATSBASEDIR"/nodes/"$ID
-		[ -d $STATSDIR ] || /bin/mkdir -p $STATSDIR
-		if [ -d $STATSDIR ]; then
-			for TIME in -4h -24h -14d -1mon -1y; do
-				GROUP=1h
-				case $TIME in
-					-4h )	GROUP="15min"
-						;;
-					-24h )
-						GROUP="1h"
-						;;
-					-14d )	GROUP="1d"
-						;;
-					-1mon )	GROUP="1d"
-						;;
-					-1y )	GROUP="1mon"
-						;;
-				esac
-				URL="http://localhost:8002/render?target=summarize(freifunk.nodes."$ID".clientcount,\""$GROUP"\",\"avg\")&format=json&from="$TIME
-				JSON=$STATSDIR"/clientcount_"$TIME".json"
-				wget -qO "$JSON" "$URL"
-			done	
-		fi
-	done
-}
-
-
 # Push stats to the web server
 function push_stats() {
 	rsync --delete -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/stats $BASEDIR/data/alfred-public.json ssh-721223-map@freifunk-aachen.de:~/new/
 }
-
 
 
 MINUTE=$(date +%M)
@@ -188,7 +155,6 @@ if [ "$ACTION" != "" ]; then
 		stats)  
 			update_stats
 			dump_stats
-			dump_stats_old
 			push_stats
 			;;
 		stats-test)
