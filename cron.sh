@@ -59,7 +59,19 @@ function dump_alfred() {
 	jq '[.|to_entries[] as $node|{ key: $node.key, value: {
 			hostname: $node.value.hostname,
 			software: $node.value.software,
-			hardware: $node.value.hardware
+			hardware: $node.value.hardware,
+			memory: {
+				free: $node.value.memory.free
+			},
+			loadavg: $node.value.loadavg,
+			traffic: {
+				rx: {bytes : $node.value.traffic.rx.bytes},
+				tx: {bytes : $node.value.traffic.tx.bytes}
+			},
+			uptime: $node.value.uptime,
+			network: {
+				addresses: $node.value.network.addresses
+			}
 		}}]|from_entries|.' $BASEDIR/data/alfred-merged.json > $BASEDIR/data/alfred-public.json
 }
 
