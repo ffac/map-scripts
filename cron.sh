@@ -27,7 +27,8 @@ function update_map() {
 	cd $BASEDIR"/ffmap-backend"
 	./mkmap.sh $BASEDIR"/data"
 	filter_geo $BASEDIR/data/nodes.json $BASEDIR/data/nodes.json.tmp
-	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/nodes.json.tmp ssh-721223-map@freifunk-aachen.de:~/new/nodes.json
+	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/nodes.json.tmp ssh-721223-map@freifunk-aachen.de:~/new/nodes.json.tmp
+	ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen ssh-721223-map@freifunk-aachen.de "mv ~/new/nodes.json.tmp ~/new/nodes.json"
 	rm $BASEDIR/data/nodes.json.tmp
 	cd $CWD
 } 
@@ -38,7 +39,8 @@ function update_map_merged() {
 	php $BASEDIR"/scripts/merge/nodes_merger.php"
 	php $BASEDIR"/scripts/merge/nodes_filter.php"
 	filter_geo $BASEDIR/data/nodes-merged-aachen.json $BASEDIR/data/nodes-merged-aachen.json.tmp
-	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/nodes-merged-aachen.json.tmp ssh-721223-map@freifunk-aachen.de:~/merged/nodes.json
+	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/nodes-merged-aachen.json.tmp ssh-721223-map@freifunk-aachen.de:~/merged/nodes.json.tmp
+	ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen ssh-721223-map@freifunk-aachen.de "mv ~/merged/nodes.json.tmp ~/merged/nodes.json"
 	rm $BASEDIR/data/nodes-merged-aachen.json.tmp
 }
 
