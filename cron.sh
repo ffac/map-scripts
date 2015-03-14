@@ -127,10 +127,34 @@ function update_stats() {
 	prepare_stats | nc -q0 localhost 2003
 } 
 
+# Global domain stats
+function prepare_stats_domains() {
+	{\
+		TSTAMP=$(date +%s)
+		wget -qO- http://map.freifunk-ruhrgebiet.de/counts/?json| \
+		jq -r '.domaenen+{global: .global}|to_entries as $els|$els[] as $el|{
+			"ratio": $el.value.ratio[0],
+			"server.max": $el.value.server.max,
+			"server.min": $el.value.server.min,
+			"tunnel": $el.value.tunnel[0],
+			"clients": $el.value.clients[0],
+			"nodes.offline" : $el.value.nodes.offline,
+			"nodes.online": $el.value.nodes.online
+		}|to_entries|.[]|"freifunk.statistics.domains."+$el.key+"."+.key + " " +(.value|tostring)+" '$TSTAMP'"'
+	}
+}
+
+
+# Pipe the collected domain stats into graphite
+function update_stats_domains() {
+	prepare_stats_domains | nc -q0 localhost 2003
+}
+
 
 # For testing purposes
 function test_stats() {
 	prepare_stats
+	prepare_stats_domains
 }
 
 
@@ -188,6 +212,7 @@ if [ "$ACTION" != "" ]; then
 	case $ACTION in
 		stats)  
 			update_stats
+			update_stats_domains
 			dump_stats
 			push_stats
 			;;
@@ -217,6 +242,7 @@ else
 
 	if [ $(($MINUTE % $EVERY)) -eq 0 ]; then
 		# Every $EVERY minutes
+		update_stats_domains
 		update_hosts
 		dump_stats
 		push_stats
