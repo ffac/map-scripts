@@ -14,8 +14,10 @@ error_reporting(E_ALL ^ E_NOTICE);                                              
 
 $src_url     = "/opt/freifunk/data/nodes-merged.json";                               // source url for nodes.json
 $json_file   = "/opt/freifunk/data/nodes-merged-aachen.json";                                    // target json file
-$filters_arr = array("FFAC");                                                              // array of filterstrings
-$geo_filter = array(50.96,50.49,5.98,6.42);                                                // geo filter Städteregion Aachen (added by JvdH 20141219)
+$filters_arr = array("FFDN","FFAC","FFHRATH");                                                              // array of filterstrings
+$geo_filter = array(51.09,50.52,5.81,6.67);
+//array(51.098635254558644,50.523322568984,5.818634033203125,6.675567626953125); // MR & mrmm
+//array(50.96,50.49,5.98,6.42);                                                // geo filter Städteregion Aachen (added by JvdH 20141219)
 
 
 $src_json   = file_get_contents($src_url);                                                   // get json from source url
