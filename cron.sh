@@ -5,12 +5,30 @@ BASEDIR=/opt/freifunk
 
 source /etc/environment
 
+# Helper function to remove geo informations from given nodes
+function filter_geo() {
+	SRC=$1
+	DEST=$2
+	jq -r 'with_entries(.value |= [ .[] as $el| if
+		$el.id == "14:cc:20:31:20:84" #ffdn-Hambach_Mobil (NORDPOL)
+		or $el.id == "14:cc:20:31:20:84" #ffdn-Hambach_Mobil (NORDPOL)
+#		or $el.id == "14:cc:20:62:f8:e6" #ffac-ppnv-dr-06-orinoco-04 (Duisburg)
+#		or $el.id == "14:cc:20:62:f8:c0" #ffac-ppnv-dr-06-orinoco-01 (Duisburg)
+#		or $el.id == "14:cc:20:62:f8:5c" #ffac-ppnv-dr-06-orinoco-03 (Duisburg)
+#		or $el.id == "14:cc:20:62:f0:f4" #ffac-ppnv-dr-06-orinoco-06 (Duisburg)
+#		or $el.id == "14:cc:20:62:f6:30" #ffac-ppnv-dr-06-orinoco-02 (Duisburg)
+	then $el|. + { geo: null } else $el end ] )' $SRC > $DEST
+}
+
+
 # Create nodes.json for ffmap-d3
 function update_map() {
 	CWD=`pwd`
 	cd $BASEDIR"/ffmap-backend"
 	./mkmap.sh $BASEDIR"/data"
-	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/nodes.json ssh-721223-map@freifunk-aachen.de:~/new/nodes.json
+	filter_geo $BASEDIR/data/nodes.json $BASEDIR/data/nodes.json.tmp
+	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/nodes.json.tmp ssh-721223-map@freifunk-aachen.de:~/new/nodes.json
+	rm $BASEDIR/data/nodes.json.tmp
 	cd $CWD
 } 
 
@@ -19,7 +37,9 @@ function update_map() {
 function update_map_merged() {
 	php $BASEDIR"/scripts/merge/nodes_merger.php"
 	php $BASEDIR"/scripts/merge/nodes_filter.php"
-	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/nodes-merged-aachen.json ssh-721223-map@freifunk-aachen.de:~/merged/nodes.json
+	filter_geo $BASEDIR/data/nodes-merged-aachen.json $BASEDIR/data/nodes-merged-aachen.json.tmp
+	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/nodes-merged-aachen.json.tmp ssh-721223-map@freifunk-aachen.de:~/merged/nodes.json
+	rm $BASEDIR/data/nodes-merged-aachen.json.tmp
 }
 
 
