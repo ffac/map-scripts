@@ -84,7 +84,7 @@ function dump_batadv-vis() {
 
 # Create host file for dnsmasq to allow name resolution of nodes
 function update_hosts() {
-	jq -r '.[]|select(.network.addresses|length > 0)|.network.addresses[] +" " +.hostname +".n.ffac"|.' $BASEDIR/data/alfred-nodeinfo.json | grep -iE "^2a03" > $BASEDIR"/data/hosts"
+	jq -r '.[]|select(.network.addresses|length > 0)|.network.addresses[] +" " +.hostname +".node.freifunk-aachen.de"|.' $BASEDIR/data/alfred-nodeinfo.json | grep -iE "^2a03" > $BASEDIR"/data/hosts"
 	PID=$(pidof dnsmasq)
 	kill -SIGHUP $PID
 }
@@ -193,6 +193,9 @@ if [ "$ACTION" != "" ]; then
 			;;
 		stats-test)
 			test_stats
+			;;
+		dns)
+			update_hosts
 			;;
 		map)	
 			update_map
