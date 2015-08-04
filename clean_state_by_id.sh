@@ -5,7 +5,7 @@ NODE=$1
 BASEDIR=/opt/freifunk
 
 if [ "$NODE" != "" ]; then
-	jq "[.[]|select(.id !=\""$NODE"\")]" $BASEDIR/ffmap-backend/state.json > $BASEDIR/ffmap-backend/state.json.tmp
-	mv $BASEDIR/ffmap-backend/state.json.tmp $BASEDIR/ffmap-backend/state.json
+	jq "[.[]|select(.id !=\""$NODE"\")]" $BASEDIR/ffmap-backend-legacy/state.json > $BASEDIR/ffmap-backend-legacy/state.json.tmp
+	mv $BASEDIR/ffmap-backend-legacy/state.json.tmp $BASEDIR/ffmap-backend-legacy/state.json
 fi
 

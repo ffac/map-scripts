@@ -3,6 +3,6 @@
 
 BASEDIR=/opt/freifunk
 
-jq "[.[]|select(.name|length > 0)]" $BASEDIR/ffmap-backend/state.json > $BASEDIR/ffmap-backend/state.json.tmp
-mv $BASEDIR/ffmap-backend/state.json.tmp $BASEDIR/ffmap-backend/state.json
+jq "[.[]|select(.name|length > 0)]" $BASEDIR/ffmap-backend-legacy/state.json > $BASEDIR/ffmap-backend-legacy/state.json.tmp
+mv $BASEDIR/ffmap-backend-legacy/state.json.tmp $BASEDIR/ffmap-backend-legacy/state.json
 

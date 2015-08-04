@@ -5,23 +5,20 @@ BASEDIR=/opt/freifunk
 
 source /etc/environment
 
-# Create nodes.json for ffmap-d3
+# Create nodes.json for meshviewer
 function update_map() {
+   	$BASEDIR"/ffmap-backend/backend.py" -p 7 -d $BASEDIR"/data" -a $BASEDIR"/aliases/supernodes.json" -V $(jq -r '.[]|.network.mesh.bat0.interfaces.tunnel|.[]' $BASEDIR"/aliases/supernodes.json"|xargs)
+	mv $BASEDIR"/data/nodes.json" $BASEDIR"/data/nodes-unfiltered.json"
+	jq -c '.nodes = (.nodes | with_entries(del(.value.nodeinfo.owner, .value.statistics.traffic)))' < $BASEDIR"/data/nodes-unfiltered.json" > $BASEDIR"/data/nodes.json"
+	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR"/data/nodes.json" $BASEDIR"/data/graph.json" ssh-721223-map@freifunk-aachen.de:~/v2/data/
+
+	# Create nodes.json for ffmap-d3
 	CWD=`pwd`
-	cd $BASEDIR"/ffmap-backend"
-	./mkmap.sh $BASEDIR"/data"
-	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/nodes.json ssh-721223-map@freifunk-aachen.de:~/new/nodes.json.tmp
-	ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen ssh-721223-map@freifunk-aachen.de "mv ~/new/nodes.json.tmp ~/new/nodes.json"
+	cd $BASEDIR"/ffmap-backend-legacy"
+	./mkmap.sh $BASEDIR"/data/legacy"
+	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/legacy/nodes.json ssh-721223-map@freifunk-aachen.de:~/nodes.json.tmp
+	ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen ssh-721223-map@freifunk-aachen.de "mv ~/nodes.json.tmp ~/nodes.json"
 	cd $CWD
-} 
-
-
-# Obsolete: Merge nodes from Rheinufer with nodes from Aachen
-function update_map_merged() {
-	php $BASEDIR"/scripts/merge/nodes_merger.php"
-	php $BASEDIR"/scripts/merge/nodes_filter.php"
-	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/nodes-merged-aachen.json ssh-721223-map@freifunk-aachen.de:~/merged/nodes.json.tmp
-	ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen ssh-721223-map@freifunk-aachen.de "mv ~/merged/nodes.json.tmp ~/merged/nodes.json"
 }
 
 
@@ -66,7 +63,7 @@ function dump_batadv-vis() {
 
 # Create host file for dnsmasq to allow name resolution of nodes
 function update_hosts() {
-	jq -r '.[]|select(.network.addresses|length > 0)|.network.addresses[] +" " +.hostname +".node.freifunk-aachen.de"|.' $BASEDIR/data/alfred-nodeinfo.json | grep -iE "^2a03" > $BASEDIR"/data/hosts"
+	jq -r '.[]|select(.network.addresses|length > 0)|.network.addresses[] +" " +.hostname +".nodes.ffac"|.' $BASEDIR/data/alfred-nodeinfo.json | grep -iE "^2a03" > $BASEDIR"/data/hosts"
 	PID=$(pidof dnsmasq)
 	kill -SIGHUP $PID
 }
@@ -77,30 +74,44 @@ function prepare_stats() {
 	TSTAMP=$(date +%s)
 	{\
 		#Alfred stats
-		jq -r '.|to_entries|.[] as $node|{
-				loadavg: $node.value.loadavg,
-				uptime: $node.value.uptime,
-				"traffic.forward.bytes": $node.value.traffic.forward.bytes,
-				"traffic.mgmt_rx.bytes": $node.value.traffic.mgmt_rx.bytes,
-				"traffic.rx.bytes": $node.value.traffic.rx.bytes,
-				"traffic.mgmt_tx.bytes": $node.value.traffic.mgmt_tx.bytes,
-				"traffic.tx.bytes": $node.value.traffic.tx.bytes,
-				"rootfs_usage": $node.value.rootfs_usage,
-				"memory.buffers": $node.value.memory.buffers,
-				"memory.total": $node.value.memory.total,
-				"memory.cached": $node.value.memory.cached,
-				"memory.free": $node.value.memory.free,
-				"rootfs_usage": $node.value.rootfs_usage
-			}|to_entries|.[] as $item|select($item.value != null)|"freifunk.nodes."+$node.key+"." + $item.key +" "+($item.value|tostring)+" '$TSTAMP'"' $BASEDIR/data/alfred-statistics.json
+		jq -r '.["nodes"]|to_entries|.[] as $node|{
+				loadavg: $node.value.statistics.loadavg,
+				uptime: $node.value.statistics.uptime,
+				"traffic.forward.bytes": $node.value.statistics.traffic.forward.bytes,
+				"traffic.mgmt_rx.bytes": $node.value.statistics.traffic.mgmt_rx.bytes,
+				"traffic.rx.bytes": $node.value.statistics.traffic.rx.bytes,
+				"traffic.mgmt_tx.bytes": $node.value.statistics.traffic.mgmt_tx.bytes,
+				"traffic.tx.bytes": $node.value.statistics.traffic.tx.bytes,
+				"rootfs_usage": $node.value.statistics.rootfs_usage,
+				"memory.buffers": $node.value.statistics.memory.buffers,
+				"memory.total": $node.value.statistics.memory.total,
+				"memory.cached": $node.value.statistics.memory.cached,
+				"memory.free": $node.value.statistics.memory.free,
+				"rootfs_usage": $node.value.statistics.rootfs_usage,
+				"online" : (if $node.value.flags.online != null then (if $node.value.flags.online == true then "1" else "0" end) else null end),
+				"clientcount" : ($node.value.statistics.clients // 0)
+			}|to_entries|.[] as $item|select($item.value != null)|"freifunk.nodes."+$node.key+"." + $item.key +" "+($item.value|tostring)+" '$TSTAMP'"' $BASEDIR/data/nodes-unfiltered.json
+	} | sed -r 's/\.nodes\.([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})\./\.nodes\.\1:\2:\3:\4:\5:\6\./ig'
+}
 
+# Collect stats for piping them into influxdb
+function init_stats_influxdb() {
+	curl -G http://localhost:8086/query --data-urlencode "CREATE DATABASE nodes"
+}
 
-		#Nodes stats
-		jq -r '.nodes[] as $node|{
-				online: (if $node.flags.online != null then (if $node.flags.online == true then "1" else "0" end) else null end),
-				clientcount: $node.clientcount
-			}|to_entries|.[] as $item|select($item.value != null)|"freifunk.nodes."+$node.id+"." + $item.key +" "+($item.value|tostring)+" '$TSTAMP'"' $BASEDIR/data/nodes.json
-
-	}
+function prepare_stats_influxdb() {
+        TSTAMP=$(date +%s)
+        {\
+                #Alfred stats
+                jq -r '.["nodes"]|to_entries|.[] as $node|{
+                                load: ("avg="+($node.value.statistics.loadavg // 0.0|tostring)),
+                                uptime: ("uptime="+((($node.value.statistics.uptime // 0.0))|tostring)),
+                                traffic: ("forward="+($node.value.statistics.traffic.forward.bytes // 0.0|tostring)+",mgmt_rx="+($node.value.statistics.traffic.mgmt_rx.bytes // 0.0|tostring)+",rx="+($node.value.statistics.traffic.rx.bytes // 0.0|tostring)+",mgmt_tx="+($node.value.statistics.traffic.mgmt_tx.bytes // 0.0|tostring)+",tx="+($node.value.statistics.traffic.tx.bytes // 0.0|tostring)),
+                                "fs_usage": ("rootfs="+($node.value.statistics.rootfs_usage // 0.0|tostring)),
+                                memory: ("buffers="+($node.value.statistics.memory.buffers // 0.0|tostring)+",total="+($node.value.statistics.memory.total // 0.0|tostring)+",cached="+($node.value.statistics.memory.cached // 0.0|tostring)+",free="+($node.value.statistics.memory.free // 0.0|tostring)),
+				status: ("online="+(if $node.value.flags.online != null then (if $node.value.flags.online == true then "1" else "0" end) else null end)+",clients="+($node.value.statistics.clients // 0|tostring))
+                        }|to_entries|.[] as $item|select($item.value != null)|$item.key +",id="+$node.key+" "+($item.value|tostring)+" '$TSTAMP'"' $BASEDIR/data/nodes-unfiltered.json
+         } | sed -r 's/((avg|uptime|rootfs)=)([0-9]+)([^\.0-9]|$)/\1\3.0\4/g'
 }
 
 
@@ -108,6 +119,12 @@ function prepare_stats() {
 function update_stats() {
 	prepare_stats | nc -q0 localhost 2003
 } 
+
+# Finally pipe the collected stats into influxdb
+function update_stats_influxdb() {
+#	prepare_stats_influxdb
+	prepare_stats_influxdb | curl -i -XPOST 'http://localhost:8086/write?db=nodes&precision=s' --data-binary @- > /dev/null 2>&1
+}
 
 # Global domain stats
 function prepare_stats_domains() {
@@ -136,7 +153,8 @@ function update_stats_domains() {
 # For testing purposes
 function test_stats() {
 	prepare_stats
-	prepare_stats_domains
+#	prepare_stats_influxdb
+#	prepare_stats_domains
 }
 
 
@@ -182,7 +200,7 @@ function dump_stats() {
 
 # Push stats to the web server
 function push_stats() {
-	rsync --delete -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/stats $BASEDIR/data/alfred-public.json ssh-721223-map@freifunk-aachen.de:~/new/
+	rsync --delete -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR/data/stats $BASEDIR/data/alfred-public.json ssh-721223-map@freifunk-aachen.de:~/
 }
 
 
@@ -192,10 +210,16 @@ EVERY=5
 if [ "$ACTION" != "" ]; then
 
 	case $ACTION in
+		init-stats-influxdb)	init_stats_influxdb
+				;;
 		stats)  
 			update_stats
 			update_stats_domains
+			update_stats_influxdb
 			dump_stats
+			push_stats
+			;;
+		stats-push)
 			push_stats
 			;;
 		stats-test)
@@ -207,9 +231,6 @@ if [ "$ACTION" != "" ]; then
 		map)	
 			update_map
 			;;
-		map-merged)
-			update_map_merged
-			;;
 		*)	
 			;;
 	esac
@@ -219,9 +240,8 @@ else
 	dump_alfred
         dump_batadv-vis
         update_map
-        update_map_merged
         update_stats
-
+	update_stats_influxdb
 	if [ $(($MINUTE % $EVERY)) -eq 0 ]; then
 		# Every $EVERY minutes
 		update_stats_domains
