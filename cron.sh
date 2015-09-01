@@ -94,37 +94,11 @@ function prepare_stats() {
 	} | sed -r 's/\.nodes\.([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})\./\.nodes\.\1:\2:\3:\4:\5:\6\./ig'
 }
 
-# Collect stats for piping them into influxdb
-function init_stats_influxdb() {
-	curl -G http://localhost:8086/query --data-urlencode "CREATE DATABASE nodes"
-}
-
-function prepare_stats_influxdb() {
-        TSTAMP=$(date +%s)
-        {\
-                #Alfred stats
-                jq -r '.["nodes"]|to_entries|.[] as $node|{
-                                load: ("avg="+($node.value.statistics.loadavg // 0.0|tostring)),
-                                uptime: ("uptime="+((($node.value.statistics.uptime // 0.0))|tostring)),
-                                traffic: ("forward="+($node.value.statistics.traffic.forward.bytes // 0.0|tostring)+",mgmt_rx="+($node.value.statistics.traffic.mgmt_rx.bytes // 0.0|tostring)+",rx="+($node.value.statistics.traffic.rx.bytes // 0.0|tostring)+",mgmt_tx="+($node.value.statistics.traffic.mgmt_tx.bytes // 0.0|tostring)+",tx="+($node.value.statistics.traffic.tx.bytes // 0.0|tostring)),
-                                "fs_usage": ("rootfs="+($node.value.statistics.rootfs_usage // 0.0|tostring)),
-                                memory: ("buffers="+($node.value.statistics.memory.buffers // 0.0|tostring)+",total="+($node.value.statistics.memory.total // 0.0|tostring)+",cached="+($node.value.statistics.memory.cached // 0.0|tostring)+",free="+($node.value.statistics.memory.free // 0.0|tostring)),
-				status: ("online="+(if $node.value.flags.online != null then (if $node.value.flags.online == true then "1" else "0" end) else null end)+",clients="+($node.value.statistics.clients // 0|tostring))
-                        }|to_entries|.[] as $item|select($item.value != null)|$item.key +",id="+$node.key+" "+($item.value|tostring)+" '$TSTAMP'"' $BASEDIR/data/nodes-unfiltered.json
-         } | sed -r 's/((avg|uptime|rootfs)=)([0-9]+)([^\.0-9]|$)/\1\3.0\4/g'
-}
-
-
 # Finally pipe the collected stats into graphite
 function update_stats() {
 	prepare_stats | nc -q0 localhost 2003
 } 
 
-# Finally pipe the collected stats into influxdb
-function update_stats_influxdb() {
-#	prepare_stats_influxdb
-	prepare_stats_influxdb | curl -i -XPOST 'http://localhost:8086/write?db=nodes&precision=s' --data-binary @- > /dev/null 2>&1
-}
 
 # Global domain stats
 function prepare_stats_domains() {
@@ -152,8 +126,7 @@ function update_stats_domains() {
 
 # For testing purposes
 function test_stats() {
-	prepare_stats
-#	prepare_stats_influxdb
+#	prepare_stats
 #	prepare_stats_domains
 }
 
@@ -205,19 +178,20 @@ function push_stats() {
 
 
 MINUTE=$(date +%M)
-EVERY=5
+EVERY=15
 
 if [ "$ACTION" != "" ]; then
 
 	case $ACTION in
-		init-stats-influxdb)	init_stats_influxdb
-				;;
 		stats)  
 			update_stats
 			update_stats_domains
-			update_stats_influxdb
 			dump_stats
 			push_stats
+			;;
+		stats-update)
+			update_stats
+                        update_stats_domains
 			;;
 		stats-push)
 			push_stats
@@ -241,7 +215,6 @@ else
         dump_batadv-vis
         update_map
         update_stats
-	update_stats_influxdb
 	if [ $(($MINUTE % $EVERY)) -eq 0 ]; then
 		# Every $EVERY minutes
 		update_stats_domains
