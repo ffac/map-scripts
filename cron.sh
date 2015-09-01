@@ -124,13 +124,6 @@ function update_stats_domains() {
 }
 
 
-# For testing purposes
-function test_stats() {
-#	prepare_stats
-#	prepare_stats_domains
-}
-
-
 # Create json files containing stat data for chart views
 function dump_stats() {
         STATSBASEDIR=$BASEDIR"/data/stats/"
@@ -195,9 +188,6 @@ if [ "$ACTION" != "" ]; then
 			;;
 		stats-push)
 			push_stats
-			;;
-		stats-test)
-			test_stats
 			;;
 		dns)
 			update_hosts
