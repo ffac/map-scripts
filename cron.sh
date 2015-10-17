@@ -7,10 +7,26 @@ source /etc/environment
 
 # Create nodes.json for meshviewer
 function update_map() {
-   	$BASEDIR"/ffmap-backend/backend.py" -p 7 -d $BASEDIR"/data" -a $BASEDIR"/aliases/supernodes.json" -V $(jq -r '.[]|.network.mesh.bat0.interfaces.tunnel|.[]' $BASEDIR"/aliases/supernodes.json"|xargs)
+	RES=`$BASEDIR"/ffmap-backend-test/backend.py" -p 7 -d $BASEDIR"/ffmap-backend-test/data" -a $BASEDIR"/aliases/supernodes.json" -V $(jq -r '.[]|.network.mesh.bat0.interfaces.tunnel|.[]' $BASEDIR"/aliases/supernodes.json"|xargs) --with-graphite --graphite-host localhost --graphite-port 2003 --graphite-prefix "freifunk.test.nodes." --graphite-with-links --graphite-links-prefix "freifunk.test.links." 2>&1`
+	if [ "$RES" != "" ]; then
+                date >> $BASEDIR"/logs/ffmap-backend-test.log"
+                echo "$RES" >> $BASEDIR"/logs/ffmap-backend-test.log"
+        fi
+
+   	RES=`$BASEDIR"/ffmap-backend/backend.py" -p 7 -d $BASEDIR"/data" -a $BASEDIR"/aliases/supernodes.json" -V $(jq -r '.[]|.network.mesh.bat0.interfaces.tunnel|.[]' $BASEDIR"/aliases/supernodes.json"|xargs) 2>&1`
+	if [ "$RES" != "" ]; then
+		date >> $BASEDIR"/logs/ffmap-backend.log"
+		echo "$RES" >> $BASEDIR"/logs/ffmap-backend.log"
+	fi
+
 	mv $BASEDIR"/data/nodes.json" $BASEDIR"/data/nodes-unfiltered.json"
 	jq -c '.nodes = (.nodes | with_entries(del(.value.nodeinfo.owner, .value.statistics.traffic)))' < $BASEDIR"/data/nodes-unfiltered.json" > $BASEDIR"/data/nodes.json"
 	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR"/data/nodes.json" $BASEDIR"/data/graph.json" ssh-721223-map@freifunk-aachen.de:~/v2/data/
+
+	# TEST
+	mv $BASEDIR"/ffmap-backend-test/data/nodes.json" $BASEDIR"/ffmap-backend-test/data/nodes-unfiltered.json"
+	jq -c '.nodes = (.nodes | to_entries |  map(del(.value.nodeinfo.owner,.value.statistics.traffic) .value) )' < $BASEDIR"/ffmap-backend-test/data/nodes-unfiltered.json" > $BASEDIR"/ffmap-backend-test/data/nodes.json"
+	rsync -q -avz -e "ssh -i $BASEDIR/keys/ssh-721223-map_freifunk_aachen" $BASEDIR"/ffmap-backend-test/data/nodes.json" $BASEDIR"/ffmap-backend-test/data/graph.json" ssh-721223-map@freifunk-aachen.de:~/v4/data/
 
 	# Create nodes.json for ffmap-d3
 	CWD=`pwd`
@@ -90,8 +106,8 @@ function prepare_stats() {
 				"rootfs_usage": $node.value.statistics.rootfs_usage,
 				"online" : (if $node.value.flags.online != null then (if $node.value.flags.online == true then "1" else "0" end) else null end),
 				"clientcount" : ($node.value.statistics.clients // 0)
-			}|to_entries|.[] as $item|select($item.value != null)|"freifunk.nodes."+$node.key+"." + $item.key +" "+($item.value|tostring)+" '$TSTAMP'"' $BASEDIR/data/nodes-unfiltered.json
-	} | sed -r 's/\.nodes\.([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})\./\.nodes\.\1:\2:\3:\4:\5:\6\./ig'
+			}|to_entries|.[] as $item|select($item.value != null)|"freifunk.nodes-legacy."+$node.key+"." + $item.key +" "+($item.value|tostring)+" '$TSTAMP'"' $BASEDIR/data/nodes-unfiltered.json
+	} | sed -r 's/\.nodes-legacy\.([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})\./\.nodes-legacy\.\1:\2:\3:\4:\5:\6\./ig'
 }
 
 # Finally pipe the collected stats into graphite
@@ -142,7 +158,7 @@ function dump_stats() {
 		["traffic.rx.bytes"]="sum"
 		["traffic.tx.bytes"]="sum"
         )
-        for ID in `ls $GRAPHITEBASEDIR/storage/whisper/freifunk/nodes/`; do
+        for ID in `ls $GRAPHITEBASEDIR/storage/whisper/freifunk/nodes-legacy/`; do
                 STATSDIR=$STATSBASEDIR"/nodes/"$ID
                 [ -d $STATSDIR ] || /bin/mkdir -p $STATSDIR
                 if [ -d $STATSDIR ]; then
@@ -154,7 +170,7 @@ function dump_stats() {
                                 GURL="http://localhost:8002/render?format=json&from=-"$TIME
                                 for METRIC in "${!METRICSAGGREGATION[@]}"; do
                                         AGG=${METRICSAGGREGATION["$METRIC"]}
-                                        GURL+="&target=alias(summarize(freifunk.nodes."$ID"."$METRIC",\""$GROUP"\",\""$AGG"\"),\""$METRIC"_"$TIME"\")"
+                                        GURL+="&target=alias(summarize(freifunk.nodes-legacy."$ID"."$METRIC",\""$GROUP"\",\""$AGG"\"),\""$METRIC"_"$TIME"\")"
                                 done
                                 wget -qO- "$GURL"
                         done
